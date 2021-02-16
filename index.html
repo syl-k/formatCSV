@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="UTF-8">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Reverse Lab</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/encoding-japanese/1.0.30/encoding.min.js"></script>
+    <script type="text/javascript">
+        window.onload = function () {
+            const outputCsv = document.getElementById('color_list');
+            const productId = document.getElementById('product_id');
+
+            function csvArray(data) {
+                var dataArray = [], memberIdArray = [];
+                const dataString = data.split('\r\n');
+                for (let i = 0; i < dataString.length; i++) {
+                    dataArray[i] = dataString[i].split(',');
+                    if (i === 0) {
+                        dataArray[i].push('元オーダーID（受注番号）');
+                        continue;
+                    }
+                    dataArray[i].push(dataArray[i][0]);
+
+                    let csvProductId = dataArray[i][37];
+                    // 商品IDがクロス商品でない場合
+                    if (csvProductId !== productId) {
+                        // key: 会員ID, value: オーダーID
+                        memberIdArray[dataArray[i][2]] = dataArray[i][0];
+                    }
+                }
+
+                return [dataArray, memberIdArray];
+            }
+
+            let formatArray = function (c, m) {
+                let changedOrderIdLogs = [];
+                c.forEach(row => {
+                    let memberId = row[2];
+                    let validOrderId = m[memberId];
+                    if (validOrderId === undefined) {
+                        return;
+                    }
+
+                    let currentOrderId = row[0];
+                    if (validOrderId !== currentOrderId) {
+                        changedOrderIdLogs.push(currentOrderId + ' -> ' + validOrderId + '\n');
+                    }
+                    row[0] = validOrderId;
+                });
+                return [c, changedOrderIdLogs];
+            }
+
+            function checkFileReader() {
+                let isUse = false;
+                if (window.File && window.FileReader && window.FileList && window.Blob) {
+                    isUse = true;
+                }
+                return isUse;
+            }
+
+            function str2Array(str) {
+                let array = [], i, il = str.length;
+                for (i = 0; i < il; i++) array.push(str.charCodeAt(i));
+                return array;
+            }
+
+            function downloadCSV(records) {
+                // IE10/11用(download属性が機能しないためmsSaveBlobを使用）
+                if (window.navigator.msSaveBlob) {
+                    window.navigator.msSaveBlob(blob, fileName);
+                } else {
+                    let data = records.map((record) => record.join(',')).join('\r\n');
+
+                    let bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                    let blob = new Blob([bom, data], { type: 'text/csv' });
+                    let url = (window.URL || window.webkitURL).createObjectURL(blob);
+                    let link = document.createElement('a');
+                    link.download = 'result.csv';
+                    link.href = url;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            }
+
+            const inputFiles = document.getElementById('input_file');
+            inputFiles.addEventListener('change', function (e) {
+                if (!checkFileReader()) {
+                    alert('エラー：FileAPI非対応のブラウザです。')
+                    return;
+                }
+
+                const file = e.target.files[0]
+                if (file.type === 'text/csv') {
+                    let reader = new FileReader();
+                    reader.readAsBinaryString(file)
+
+                    reader.onload = function (event) {
+                        var result = event.target.result;
+                        var sjisArray = str2Array(result);
+                        var uniArray = Encoding.convert(sjisArray, 'UNICODE', 'SJIS');
+                        result = Encoding.codeToString(uniArray);
+
+                        let [csvOutputData, memberIdAndOrderIdArray] = csvArray(result);
+                        let [resultCsvData, changeLogs] = formatArray(csvOutputData, memberIdAndOrderIdArray);
+                        outputCsv.innerHTML = changeLogs; // 表示
+
+                        downloadCSV(resultCsvData);
+                    };
+
+                    reader.onerror = function () {
+                        alert('エラー：ファイルをロードできません。')
+                    };
+                } else {
+                    alert('CSVファイルを選択してください')
+                }
+            }, false);
+        };
+    </script>
+</head>
+
+<body>
+    <div>
+        <p>結果</p>
+    </div>
+    <div id="color_list"></div>
+
+    <input type="file" id="input_file" />
+
+    <div>
+        <p>クロス商品ID</p>
+    </div>
+    <input type="number" size="3" id="product_id" />
+</body>
+
+</html>
