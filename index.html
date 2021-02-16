@@ -8,25 +8,29 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/encoding-japanese/1.0.30/encoding.min.js"></script>
     <script type="text/javascript">
         window.onload = function () {
-            const outputCsv = document.getElementById('color_list');
-            const productId = document.getElementById('product_id');
+            const DOWNLOAD_FILE_NAME = 'result.csv';
+            const CHANGE_LOGS_VIEW_AREA = document.getElementById('result_list');
+            const PRODUCT_ID = document.getElementById('product_id');
 
-            function csvArray(data) {
+            let getCsvArray = function (data) {
                 var dataArray = [], memberIdArray = [];
-                const dataString = data.split('\r\n');
-                for (let i = 0; i < dataString.length; i++) {
-                    dataArray[i] = dataString[i].split(',');
+                const DATA_STRING = data.split('\r\n');
+                for (let i = 0; i < DATA_STRING.length; i++) {
+                    dataArray[i] = DATA_STRING[i].split(',');
                     if (i === 0) {
                         dataArray[i].push('元オーダーID（受注番号）');
                         continue;
                     }
-                    dataArray[i].push(dataArray[i][0]);
+                    dataArray[i].push(dataArray[i][0]); // オーダーIDを最後尾に追加
 
                     let csvProductId = dataArray[i][37];
                     // 商品IDがクロス商品でない場合
-                    if (csvProductId !== productId) {
-                        // key: 会員ID, value: オーダーID
-                        memberIdArray[dataArray[i][2]] = dataArray[i][0];
+                    if (csvProductId !== PRODUCT_ID) {
+                        const MEMBER_ID = dataArray[i][2];
+                        memberIdArray[MEMBER_ID] = [];
+                        // key: 会員ID, value[0]: オーダーID, value[1]: オーダーID(ハイフンなし)
+                        memberIdArray[MEMBER_ID].push(dataArray[i][0]);
+                        memberIdArray[MEMBER_ID].push(dataArray[i][1]);
                     }
                 }
 
@@ -37,21 +41,23 @@
                 let changedOrderIdLogs = [];
                 c.forEach(row => {
                     let memberId = row[2];
-                    let validOrderId = m[memberId];
-                    if (validOrderId === undefined) {
+                    let orderId = m[memberId];
+                    if (orderId === undefined || orderId.length === 0) {
                         return;
                     }
 
                     let currentOrderId = row[0];
+                    let validOrderId = orderId[0];
                     if (validOrderId !== currentOrderId) {
-                        changedOrderIdLogs.push(currentOrderId + ' -> ' + validOrderId + '\n');
+                        changedOrderIdLogs.push(currentOrderId + ' -> ' + validOrderId + '</br>');
                     }
                     row[0] = validOrderId;
+                    row[1] = orderId[1];
                 });
                 return [c, changedOrderIdLogs];
             }
 
-            function checkFileReader() {
+            let checkFileReader = function () {
                 let isUse = false;
                 if (window.File && window.FileReader && window.FileList && window.Blob) {
                     isUse = true;
@@ -59,13 +65,13 @@
                 return isUse;
             }
 
-            function str2Array(str) {
+            let str2Array = function (str) {
                 let array = [], i, il = str.length;
                 for (i = 0; i < il; i++) array.push(str.charCodeAt(i));
                 return array;
             }
 
-            function downloadCSV(records) {
+            let downloadCSV = function (records) {
                 // IE10/11用(download属性が機能しないためmsSaveBlobを使用）
                 if (window.navigator.msSaveBlob) {
                     window.navigator.msSaveBlob(blob, fileName);
@@ -76,7 +82,7 @@
                     let blob = new Blob([bom, data], { type: 'text/csv' });
                     let url = (window.URL || window.webkitURL).createObjectURL(blob);
                     let link = document.createElement('a');
-                    link.download = 'result.csv';
+                    link.download = DOWNLOAD_FILE_NAME;
                     link.href = url;
                     document.body.appendChild(link);
                     link.click();
@@ -84,17 +90,17 @@
                 }
             }
 
-            const inputFiles = document.getElementById('input_file');
-            inputFiles.addEventListener('change', function (e) {
+            const INPUT_FILE = document.getElementById('input_file');
+            INPUT_FILE.addEventListener('change', function (e) {
                 if (!checkFileReader()) {
                     alert('エラー：FileAPI非対応のブラウザです。')
                     return;
                 }
 
-                const file = e.target.files[0]
-                if (file.type === 'text/csv') {
+                const UPLOAD_FILE = e.target.files[0]
+                if (UPLOAD_FILE.type === 'text/csv') {
                     let reader = new FileReader();
-                    reader.readAsBinaryString(file)
+                    reader.readAsBinaryString(UPLOAD_FILE)
 
                     reader.onload = function (event) {
                         var result = event.target.result;
@@ -102,13 +108,12 @@
                         var uniArray = Encoding.convert(sjisArray, 'UNICODE', 'SJIS');
                         result = Encoding.codeToString(uniArray);
 
-                        let [csvOutputData, memberIdAndOrderIdArray] = csvArray(result);
+                        let [csvOutputData, memberIdAndOrderIdArray] = getCsvArray(result);
                         let [resultCsvData, changeLogs] = formatArray(csvOutputData, memberIdAndOrderIdArray);
-                        outputCsv.innerHTML = changeLogs; // 表示
+                        CHANGE_LOGS_VIEW_AREA.innerHTML = changeLogs; // 表示
 
                         downloadCSV(resultCsvData);
                     };
-
                     reader.onerror = function () {
                         alert('エラー：ファイルをロードできません。')
                     };
@@ -122,16 +127,16 @@
 
 <body>
     <div>
-        <p>結果</p>
+        <p>変更結果</p>
     </div>
-    <div id="color_list"></div>
+    <div id="result_list"></div>
 
     <input type="file" id="input_file" />
 
     <div>
-        <p>クロス商品ID</p>
+        <p>クロス商品ID : </p>
+        <input type="number" size="3" id="product_id" />
     </div>
-    <input type="number" size="3" id="product_id" />
 </body>
 
 </html>
