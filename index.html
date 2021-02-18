@@ -12,10 +12,22 @@
             const CHANGE_LOGS_VIEW_AREA = document.getElementById('result_list');
             const PRODUCT_ID = document.getElementById('product_id');
 
+            let checkNewLineCode = function (str) {
+                if (str.indexOf("\r\n") > -1) {
+                    return '\r\n';
+                } else if (str.indexOf('\n') > -1) {
+                    return '\n';
+                } else if (str.indexOf('\r') > -1) {
+                    return '\r';
+                }
+            }
+
             let getCsvArray = function (data) {
                 var dataArray = [], memberIdArray = [];
-                const DATA_STRING = data.split('\r\n');
+                const DATA_STRING = data.split(checkNewLineCode(data));
                 for (let i = 0; i < DATA_STRING.length; i++) {
+                    var s = DATA_STRING[i].split('"');
+
                     dataArray[i] = DATA_STRING[i].split(',');
                     if (i === 0) {
                         dataArray[i].push('元オーダーID（受注番号）');
